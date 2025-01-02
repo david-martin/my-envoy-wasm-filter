@@ -63,7 +63,7 @@ kubectl apply -f - <<EOF
 apiVersion: extensions.istio.io/v1alpha1
 kind: WasmPlugin
 metadata:
-  name: usage-filter-dddd
+  name: usage-filter-gggg
   namespace: default
 spec:
   targetRef:
