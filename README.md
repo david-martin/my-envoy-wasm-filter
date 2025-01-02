@@ -41,7 +41,7 @@ Make a request to the service:
 ```bash
 export GATEWAY_IP=$(kubectl get gateway openai-gateway -o jsonpath='{.status.addresses[0].value}')
 
-curl -v -k --resolve localopenai.example:443:$GATEWAY_IP -H "Content-Type: application/json" -H "Authorization: Bearer sk-0"  "https://localopenai.example/v1/chat/completions" -d '{
+curl -v --resolve openai.dm.hcpapps.net:80:$GATEWAY_IP -H "Content-Type: application/json" -H "Authorization: Bearer sk-0"  "http://openai.dm.hcpapps.net/v1/chat/completions" -d '{
     "model": "gpt-3.5-turbo",
     "messages": [
       {"role": "system", "content": "You are a helpful assistant."},
@@ -63,28 +63,35 @@ kubectl apply -f - <<EOF
 apiVersion: extensions.istio.io/v1alpha1
 kind: WasmPlugin
 metadata:
-  name: usage-filter
+  name: usage-filter-dddd
   namespace: default
 spec:
-  selector:
-    matchLabels:
-      istio.io/gateway-name: openai-gateway
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: openai-gateway
   url: "oci://quay.io/dmartin/my-wasm:latest"
   imagePullPolicy: Always
-  phase: STATS
 EOF
+```
+
+Enable wasm debug logging:
+
+```bash
+kubectl port-forward openai-gateway-istio-5fbb975c6b-6gk2b 15000:15000 &
+curl 127.0.0.1:15000/logging?wasm=debug -XPOST
 ```
 
 Send an example request again to generate some metrics:
 
 ```bash
-curl -v -k --resolve localopenai.example:443:$GATEWAY_IP -H "Content-Type: application/json" -H "Authorization: Bearer sk-0"  "https://localopenai.example/v1/chat/completions" -d '{
+while true; do curl -v --connect-timeout 10 --resolve openai.dm.hcpapps.net:80:$GATEWAY_IP -H "Content-Type: application/json" -H "Authorization: Bearer sk-0"  "http://openai.dm.hcpapps.net/v1/chat/completions" -d '{
     "model": "gpt-3.5-turbo",
     "messages": [
       {"role": "system", "content": "You are a helpful assistant."},
       {"role": "user", "content": "Hello!"}
     ]
-  }'
+  }' && sleep 30; done
 ```
 
 Verify the metrics are included in the metrics endpoint
@@ -96,7 +103,7 @@ curl http://localhost:15000/stats/prometheus
 
 ## Troubleshooting
 
-The Gateway listener has a hostname of `localopenai.example`.
+The Gateway listener has a hostname of `openai.dm.hcpapps.net`.
 The HTTPRoute is configured with the backend of the the `openai-mock` Service.
 That Service has an ExternalName of `api.openai-mock.com`, connecting to the mock OpenAI service at <https://api.openai-mock.com/#chat>.
 
@@ -133,4 +140,18 @@ If that is successful, verify you get some sort of response from the gateway:
 
 ```bash
 curl -v -k https://$GATEWAY_IP
+```
+
+Check istio logs for any errors:
+
+```bash
+kubectl logs -n istio-system -l app=istiod -f
+kubectl logs openai-gateway-istio-5fbb975c6b-ttzgf -f
+```
+
+Check the envoy proxy config dump for the wasm filter:
+
+```bash
+kubectl port-forward openai-gateway-istio-5fbb975c6b-6gk2b 15000:15000 &
+curl -s http://localhost:15000/config_dump | grep -A 50 "usage-filter"
 ```

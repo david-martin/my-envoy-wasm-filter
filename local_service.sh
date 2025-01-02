@@ -41,18 +41,13 @@ metadata:
 spec:
   gatewayClassName: istio
   listeners:
-    - name: https
-      port: 443
-      protocol: HTTPS
-      hostname: 'localopenai.example'
+    - name: http
+      port: 80
+      protocol: HTTP
+      hostname: 'openai.dm.hcpapps.net'
       allowedRoutes:
         namespaces:
           from: Same
-      tls:
-        mode: Terminate
-        certificateRefs:
-          - name: ingress-tls
-            kind: Secret
 ---
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: HTTPRoute
@@ -62,9 +57,9 @@ metadata:
 spec:
   parentRefs:
     - name: openai-gateway
-      sectionName: "https"
+      sectionName: "http"
   hostnames:
-    - "localopenai.example"
+    - "openai.dm.hcpapps.net"
   rules:
     - backendRefs:
         - name: api.openai-mock.com
