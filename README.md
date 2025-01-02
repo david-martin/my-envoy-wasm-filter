@@ -63,7 +63,7 @@ kubectl apply -f - <<EOF
 apiVersion: extensions.istio.io/v1alpha1
 kind: WasmPlugin
 metadata:
-  name: usage-filter-iiii
+  name: usage-filter
   namespace: default
 spec:
   targetRef:
@@ -98,7 +98,7 @@ Verify the metrics are included in the metrics endpoint
 
 ```bash
 kubectl port-forward openai-gateway-istio-5fbb975c6b-6gk2b 15000:15000 &
-curl http://localhost:15000/stats/prometheus
+curl -s http://localhost:15000/stats/prometheus | grep my_wasm
 ```
 
 ## Troubleshooting
