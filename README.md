@@ -82,7 +82,7 @@ kubectl port-forward openai-gateway-istio-5fbb975c6b-6gk2b 15000:15000 &
 curl 127.0.0.1:15000/logging?wasm=debug -XPOST
 ```
 
-Send an example request again to generate some metrics:
+Send some example requests to generate some metrics:
 
 ```bash
 while true; do curl -v --connect-timeout 10 --resolve openai.dm.hcpapps.net:80:$GATEWAY_IP -H "Content-Type: application/json" -H "Authorization: Bearer sk-0"  "http://openai.dm.hcpapps.net/v1/chat/completions" -d '{
@@ -100,6 +100,25 @@ Verify the metrics are included in the metrics endpoint
 kubectl port-forward openai-gateway-istio-5fbb975c6b-6gk2b 15000:15000 &
 curl -s http://localhost:15000/stats/prometheus | grep my_wasm
 ```
+
+## Visualing metrics
+
+Port forward to grafana:
+
+```bash
+kubectl port-forward svc/kube-prometheus-grafana 3000:80
+```
+
+Then access it at http://127.0.0.1:3000/ with user/pass of `admin` `prom-operator`.
+You can either execute some queries like these:
+
+```promql
+sum(rate(my_wasm_completion_tokens[5m]))
+sum(rate(my_wasm_prompt_tokens[5m]))
+sum(rate(my_wasm_total_tokens[5m]))
+```
+
+Or import the example dashboard json from `./dash.json`.
 
 ## Troubleshooting
 
