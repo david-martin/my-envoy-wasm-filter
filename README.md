@@ -119,6 +119,9 @@ sum(rate(my_wasm_total_tokens[5m]))
 ```
 
 Or import the example dashboard json from `./dash.json`.
+It should look something like this:
+
+![metrics_dashboard](./dash.png)
 
 ## Troubleshooting
 
