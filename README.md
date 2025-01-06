@@ -1,5 +1,15 @@
 # Envoy Custom Metrics via WASM (Proof of Concept)
 
+The scripts and rust code in this project show how to intercept the response body from OpenAI http requests and parse out `usage` information, transforming it into metrics.
+Envoy proxy is used to do this, and Istio with a WasmPlugin resource.
+The scripts show how to bring up a local kind cluster with all the necessary components installed.
+The steps below include commands to deploy the WasmPlugin and make http requests to an OpenAI endpoint.
+
+A Gateway and HTTPRoute are used, with a backend proxying to the mock OpenAI service at https://api.openai-mock.com/.
+As requests are made, metrics are accumulated and exposed on the `/stats/prometheus` endpoint of the gateway.
+Prometheus is deployed in the cluster as well, and configured to scrape these metrics.
+Instructions are included to call the endpoint directly and view the metrics in Grafana (also deployed).
+
 ## Building
 
 ```bash
@@ -28,7 +38,9 @@ Bring up a local kind cluster with envoy proxy (Istio):
 ./local_setup.sh
 ```
 
-Create the httproute, service and other resources to proxy requests on to an external service:
+**NOTE:** MetalLB is installed in the local kind cluster, with a hardcoded network of 10.89.0.16/28. You may need to change this to be a subnet of the `kind` docker/podman network in your local setup. You can check the network details with `docker network inspect kind` or `podman network inspect kind`.
+
+Create the httproute, service and other resources to proxy requests on to the external OpenAI mock service:
 
 ```bash
 ./local_service.sh
@@ -78,7 +90,7 @@ EOF
 Enable wasm debug logging:
 
 ```bash
-kubectl port-forward openai-gateway-istio-5fbb975c6b-6gk2b 15000:15000 &
+kubectl port-forward $(kubectl get po -l gateway.networking.k8s.io/gateway-name=openai-gateway -o name) 15000:15000 &
 curl 127.0.0.1:15000/logging?wasm=debug -XPOST
 ```
 
@@ -97,7 +109,7 @@ while true; do curl -v --connect-timeout 10 --resolve openai.dm.hcpapps.net:80:$
 Verify the metrics are included in the metrics endpoint
 
 ```bash
-kubectl port-forward openai-gateway-istio-5fbb975c6b-6gk2b 15000:15000 &
+kubectl port-forward $(kubectl get po -l gateway.networking.k8s.io/gateway-name=openai-gateway -o name) 15000:15000 &
 curl -s http://localhost:15000/stats/prometheus | grep my_wasm
 ```
 
@@ -168,12 +180,12 @@ Check istio logs for any errors:
 
 ```bash
 kubectl logs -n istio-system -l app=istiod -f
-kubectl logs openai-gateway-istio-5fbb975c6b-ttzgf -f
+kubectl logs -l gateway.networking.k8s.io/gateway-name=openai-gateway -f
 ```
 
 Check the envoy proxy config dump for the wasm filter:
 
 ```bash
-kubectl port-forward openai-gateway-istio-5fbb975c6b-6gk2b 15000:15000 &
+kubectl port-forward $(kubectl get po -l gateway.networking.k8s.io/gateway-name=openai-gateway -o name) 15000:15000 &
 curl -s http://localhost:15000/config_dump | grep -A 50 "usage-filter"
 ```
